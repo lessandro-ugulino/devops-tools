@@ -25,9 +25,9 @@ The file `deploy-role.yml` will deploy each role required to deploy this project
 
 > :warning: Make sure you read the documentation before deploying the tool.
 
-| Role Name     | Description    | Documentation                         |
-| ------------- | -------------- | ------------------------------------- |
-| ec2_scheduled | Start/Stop EC2 | [link](roles/ec2_scheduled/README.md) |
+| Role Name     | Description                                                       | Documentation                         |
+| ------------- | ----------------------------------------------------------------- | ------------------------------------- |
+| ec2_scheduled | Start/Stop EC2 with a specific tag during the morning and evening | [link](roles/ec2_scheduled/README.md) |
 
 ### Deploy
 
