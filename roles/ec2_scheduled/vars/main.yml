@@ -1,0 +1,6 @@
+check_mode: false
+
+cloudformation:
+  region: ap-southeast-2
+  Is_ChangeSet: true
+  state: present

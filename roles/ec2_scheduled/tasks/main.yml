@@ -1,0 +1,19 @@
+---
+#-----Deploy Lambda-----
+- name: Create EC2 scheduled Lambda Cloudformation from template
+  check_mode: "{{ check_mode }}"
+  template:
+    src: lambda_ec2_scheduled.yml.j2
+    dest: /tmp/ec2-scheduled.yml
+
+- name: Submit the generated template
+  cloudformation:
+    stack_name: devops-lambda-ec2-scheduled
+    region: "{{ cloudformation.region }}"
+    create_changeset: "{{ cloudformation.Is_ChangeSet }}"
+    state: "{{ cloudformation.state }}"
+    template: /tmp/ec2-scheduled.yml
+    capabilities:
+      - CAPABILITY_IAM
+      - CAPABILITY_AUTO_EXPAND
+      - CAPABILITY_NAMED_IAM

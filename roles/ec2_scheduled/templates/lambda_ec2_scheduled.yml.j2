@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  EC2 Scheduled Lambda
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "rol-lambda-ec2-scheduler"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Policies:
+        - PolicyName: pol-lambda-ec2-scheduler
+          PolicyDocument:
+            Statement:
+              - Sid: LogGroupAccess
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:CreateLogGroup"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogStreams"
+                Resource:
+                  - "arn:aws:logs:*:*:*"
+              - Sid: StartStopEc2
+                Effect: Allow
+                Action:
+                  - "ec2:StartInstances"
+                  - "ec2:StopInstances"
+                  - "ec2:DescribeInstances"
+                Resource:
+                  - "*"
+  Ec2SchedulerLambdaStart:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: "lambda-ec2-scheduler-start"
+      Description:  Lambda to start an EC2 based on Tag daily_scheduled:True
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 120
+      TracingConfig:
+        Mode: Active
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+                import boto3
+                from botocore.exceptions import ClientError
+
+                def lambda_handler(event, context):
+                    """
+                    This function will start an EC2 based on the tag daily_scheduled == True
+                    """
+                    ec2 = boto3.client('ec2')
+
+                    # Filter EC2 based on tag daily_scheduled == True
+                    filters=[{'Name':'tag:daily_scheduled', 'Values':['True']}]
+                    response=ec2.describe_instances(Filters=filters)
+
+                    try:
+                        for r in response['Reservations']:
+                            for i in r['Instances']:
+                                instance = [i["InstanceId"]]
+                                ec2.start_instances(InstanceIds=instance)
+                                print(f'EC2:', instance, 'started')
+                    except ClientError as e:
+                        print(e)
+
+  EventRuleEc2SchedulerLambdaStart:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: event-rule-start-lambda
+      State: ENABLED
+      ScheduleExpression: "cron(00 23 ? * MON-FRI *)" # 9am AEST
+      Targets:
+        -
+          Arn: !GetAtt Ec2SchedulerLambdaStart.Arn
+          Id: "StartEC2Instances"
+  EventRulePermissionLambdaStart:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt Ec2SchedulerLambdaStart.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt EventRuleEc2SchedulerLambdaStart.Arn
+
+
+  Ec2SchedulerLambdaStop:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: "lambda-ec2-scheduler-stop"
+      Description:  Lambda to stop an EC2 based on Tag daily_scheduled:True
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 120
+      TracingConfig:
+        Mode: Active
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+                import boto3
+                from botocore.exceptions import ClientError
+
+                def lambda_handler(event, context):
+                    """
+                    This function will stop an EC2 based on the tag daily_scheduled == True
+                    """
+                    ec2 = boto3.client('ec2')
+
+                    # Filter EC2 based on tag daily_scheduled == True
+                    filters=[{'Name':'tag:daily_scheduled', 'Values':['True']}]
+                    response=ec2.describe_instances(Filters=filters)
+
+                    try:
+                        for r in response['Reservations']:
+                            for i in r['Instances']:
+                                instance = [i["InstanceId"]]
+                                ec2.stop_instances(InstanceIds=instance)
+                                print(f'EC2:', instance, 'stopped')
+                    except ClientError as e:
+                        print(e)
+
+  EventRuleEc2SchedulerLambdaStop:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: event-rule-stop-lambda
+      State: ENABLED
+      ScheduleExpression: "cron(00 8 ? * MON-FRI *)" # 6pm AEST
+      Targets:
+        -
+          Arn: !GetAtt Ec2SchedulerLambdaStop.Arn
+          Id: "StopEC2Instances"
+  EventRulePermissionLambdaStop:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt Ec2SchedulerLambdaStop.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt EventRuleEc2SchedulerLambdaStop.Arn
+
+
+Outputs:
+  LambdaStartFunctionArn:
+    Description: ARN of the Lambda Function - Start
+    Value: !GetAtt Ec2SchedulerLambdaStart.Arn
+    Export:
+      Name: "rol-lambda-ec2-scheduler-start-arn"
+  LambdaStopFunctionArn:
+    Description: ARN of the Lambda Function - Stop
+    Value: !GetAtt Ec2SchedulerLambdaStop.Arn
+    Export:
+      Name: "rol-lambda-ec2-scheduler-stop-arn"
+
+
