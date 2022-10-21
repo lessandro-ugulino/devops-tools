@@ -4,6 +4,7 @@
 
 - [Summary](#summary)
 - [Diagram](#diagram)
+- [Requirements](#requirements)
 - [Possible modifications](#possible-modifications)
 
 ## Summary
@@ -13,6 +14,10 @@ Start all EC2 instances with specific tag (Key:daily_scheduled Value:True) every
 ## Diagram
 
 ![lambda-diagram](/imgs/start_stop_lambda.png)
+
+## Requirements
+
+Tag all EC2 with the tag `Key:daily_scheduled Value:True` that will be started and stopped using these lambdas function.
 
 ## Possible modifications
 
