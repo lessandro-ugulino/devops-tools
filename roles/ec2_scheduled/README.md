@@ -17,7 +17,7 @@ Start all EC2 instances with specific tag (Key:daily_scheduled Value:True) every
 
 ## Requirements
 
-Tag all EC2 with the tag `Key:daily_scheduled Value:True` that will be started and stopped using these lambdas function.
+Tag all EC2 with the tag `Key:daily_scheduled Value:True` that will be started and stopped using these lambdas functions.
 
 ## Possible modifications
 
