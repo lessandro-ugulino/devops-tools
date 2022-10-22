@@ -1,0 +1,19 @@
+---
+#-----Deploy Lambda-----
+- name: Create Report Unused Vol Lambda Cloudformation from template
+  check_mode: "{{ check_mode }}"
+  template:
+    src: lambda_report_volumes_unused.yml.j2
+    dest: /tmp/lambda_report_volumes_unused.yml
+
+- name: Submit the generated template
+  cloudformation:
+    stack_name: devops-lambda-report-volumes-unused
+    region: "{{ cloudformation.region }}"
+    create_changeset: "{{ cloudformation.Is_ChangeSet }}"
+    state: "{{ cloudformation.state }}"
+    template: /tmp/lambda_report_volumes_unused.yml
+    capabilities:
+      - CAPABILITY_IAM
+      - CAPABILITY_AUTO_EXPAND
+      - CAPABILITY_NAMED_IAM

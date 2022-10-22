@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Lambda - report Unused Volumes
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "rol-lambda-report-unused-vol"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Policies:
+        - PolicyName: pol-lambda-report-unused-vol
+          PolicyDocument:
+            Statement:
+              - Sid: LogGroupAccess
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:CreateLogGroup"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogStreams"
+                Resource:
+                  - "arn:aws:logs:*:*:*"
+              - Sid: SNS
+                Effect: Allow
+                Action:
+                  - sns:ListSubscriptionsByTopic
+                  - sns:GetTopicAttributes
+                  - sns:ListSMSSandboxPhoneNumbers
+                  - sns:ListTopics
+                  - sns:ListSubscriptions
+                  - sns:ListOriginationNumbers
+                  - sns:ListEndpointsByPlatformApplication
+                  - sns:Publish
+                  - sns:ListPlatformApplications
+                Resource:
+                  - "*"
+              - Sid: IAM
+                Effect: Allow
+                Action:
+                  - iam:ListAccountAliases
+                Resource:
+                  - "*"
+              - Sid: EC2
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVolumeAttribute
+                  - ec2:DescribeVolumeStatus
+                  - ec2:DescribeVolumes
+                  - sns:ListPlatformApplications
+                Resource:
+                  - "*"
+
+
+  reportUnusedVolSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: 'topic-report-unused-vol'
+      TopicName: 'topic-report-unused-vol'
+  reportUnusedVolSub:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: lezampieri@hotmail.com # your email
+      Protocol: email
+      TopicArn: !Ref 'reportUnusedVolSNSTopic'
+
+  reportUnusedVolLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: "lambda-report-unused-vol"
+      Description:  Lambda to report unused volumes
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Timeout: 120
+      TracingConfig:
+        Mode: Active
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+            import boto3
+            import os
+
+            def lambda_handler(event, context):
+
+              ec2 = boto3.client('ec2')
+              sns_client = boto3.client('sns')
+              client_sts = boto3.client('sts')
+              client_alias = boto3.client('iam')
+
+              acc_id = client_sts.get_caller_identity()["Account"]
+              acc_name = client_alias.list_account_aliases()['AccountAliases'][0]
+
+              SnsTopic = os.environ['SnsTopic']
+              volumes = ec2.describe_volumes()
+              unused_vol = []
+
+              for vol in volumes['Volumes']:
+                if len(vol['Attachments']) == 0:
+                  unused_vol.append(vol['VolumeId'])
+
+              sns_client.publish(
+                  TopicArn=SnsTopic,
+                  Subject='reporting - Unused Volume List [' + acc_name + '] ' + '[' + acc_id + ']',
+                  Message=str(unused_vol)
+              )
+              return "success"
+      Environment:
+        Variables:
+          SnsTopic: !Ref 'reportUnusedVolSNSTopic'
+
+  EventRulereportUnusedVolLambda:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: event-rule-report-unused-vol
+      State: ENABLED
+      ScheduleExpression: "cron(00 23 ? * MON *)" # 9am AEST
+      Targets:
+        -
+          Arn: !GetAtt reportUnusedVolLambda.Arn
+          Id: "reportUnusedVol"
+  EventRulePermissionLambdareportUnusedVol:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt reportUnusedVolLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt EventRulereportUnusedVolLambda.Arn
+
+
+
