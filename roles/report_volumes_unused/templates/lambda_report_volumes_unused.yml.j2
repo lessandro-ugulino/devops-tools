@@ -108,12 +108,13 @@ Resources:
                 if len(vol['Attachments']) == 0:
                   unused_vol.append(vol['VolumeId'])
 
-              sns_client.publish(
-                  TopicArn=SnsTopic,
-                  Subject='reporting - Unused Volume List [' + acc_name + '] ' + '[' + acc_id + ']',
-                  Message=str(unused_vol)
-              )
-              return "success"
+              if len(unused_vol) > 0:
+                sns_client.publish(
+                    TopicArn=SnsTopic,
+                    Subject='reporting - Unused Volume List [' + acc_name + '] ' + '[' + acc_id + ']',
+                    Message=str(unused_vol)
+                )
+                return "success"
       Environment:
         Variables:
           SnsTopic: !Ref 'reportUnusedVolSNSTopic'
